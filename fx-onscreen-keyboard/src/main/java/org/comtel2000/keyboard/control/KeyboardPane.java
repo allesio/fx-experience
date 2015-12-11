@@ -10,15 +10,15 @@ package org.comtel2000.keyboard.control;
  * are permitted provided that the following conditions are met:
  * 
  * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
+ * list of conditions and the following disclaimer.
  * 
  * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
  * 
  * 3. Neither the name of the comtel2000 nor the names of its contributors
- *    may be used to endorse or promote products derived from this software without
- *    specific prior written permission.
+ * may be used to endorse or promote products derived from this software without
+ * specific prior written permission.
  * 
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -71,8 +71,10 @@ import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
+import javafx.collections.ObservableList;
 import javafx.event.Event;
 import javafx.event.EventHandler;
+import javafx.geometry.Bounds;
 import javafx.geometry.HPos;
 import javafx.geometry.Pos;
 import javafx.geometry.VPos;
@@ -88,9 +90,10 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.RowConstraints;
+import javafx.scene.layout.VBox;
 import javafx.stage.WindowEvent;
 
-public class KeyboardPane extends Region implements StandardKeyCode, EventHandler<KeyButtonEvent> {
+public class KeyboardPane extends VBox implements StandardKeyCode, EventHandler<KeyButtonEvent> {
 
 	private final static org.slf4j.Logger logger = LoggerFactory.getLogger(KeyboardPane.class);
 
@@ -143,17 +146,21 @@ public class KeyboardPane extends Region implements StandardKeyCode, EventHandle
 	public KeyboardPane() {
 		getStyleClass().add("key-background");
 		setFocusTraversable(false);
+		setPrefWidth(1024);
+		// setPrefHeight(0);
+		setMaxWidth(1500);
 		handler = new KeyboardLayoutHandler(isCacheLayout());
 	}
 
 	// @Override (JDK 8u40 or later)
+	@Override
 	public String getUserAgentStylesheet() {
 		return keyBoardStyleProperty.get();
 	}
 
 	public void load() throws MalformedURLException, IOException, URISyntaxException {
 
-		if (robots.isEmpty()){
+		if (robots.isEmpty()) {
 			logger.debug("load default fx robot handler");
 			robots.add(new FXRobotHandler());
 		}
@@ -163,16 +170,42 @@ public class KeyboardPane extends Region implements StandardKeyCode, EventHandle
 		setKeyboardType(KeyboardType.TEXT);
 
 		if (scaleProperty.get() != 1.0) {
-			setScaleX(scaleProperty.get());
-			setScaleY(scaleProperty.get());
+			// setScaleX(scaleProperty.get());
+			// setScaleY(scaleProperty.get());
+			zoom(this, scaleProperty.get(), 0, 0);
 		}
 
 		scaleProperty.addListener((l, o, s) -> {
 			if (o != s) {
-				setScaleX(s.doubleValue());
-				setScaleY(s.doubleValue());
+				// setScaleX(s.doubleValue());
+				// setScaleY(s.doubleValue());
+				zoom(getChildren().get(0), scaleProperty.get(), 0, 0);
 			}
 		});
+	}
+
+	public static void zoom(Node node, double factor, double x, double y) {
+		double oldScale = node.getScaleX();
+		double scale = oldScale * factor;
+		if (scale < 0.05)
+			scale = 0.05;
+		if (scale > 50)
+			scale = 50;
+		node.setScaleX(scale);
+		node.setScaleY(scale);
+
+		double f = (scale / oldScale) - 1;
+		Bounds bounds = node.localToScene(node.getBoundsInLocal());
+		double dx = (x - (bounds.getWidth() / 2 + bounds.getMinX()));
+		double dy = (y - (bounds.getHeight() / 2 + bounds.getMinY()));
+		System.out.println("KeyboardPane.zoom(B) " + bounds.getMinX() + ", " + bounds.getMinY());
+
+		double xt = node.getTranslateX() - f * dx;
+		node.setTranslateX(xt < 0 ? 0 : xt);
+		double yt = node.getTranslateY() - f * dy;
+		node.setTranslateY(yt < 0 ? 0 : yt);
+
+		System.out.println("KeyboardPane.zoom() " + node.getTranslateX() + ", " + node.getTranslateY());
 	}
 
 	private void setKeyboardType(boolean ctrl, boolean shift, boolean symbol) {
@@ -345,7 +378,8 @@ public class KeyboardPane extends Region implements StandardKeyCode, EventHandle
 	public void setKeyboardType(String type) {
 		KeyboardType kType;
 		try {
-			kType = type == null || type.isEmpty() ? KeyboardType.TEXT : KeyboardType.valueOf(type.toUpperCase(Locale.ENGLISH));
+			kType = type == null || type.isEmpty() ? KeyboardType.TEXT
+					: KeyboardType.valueOf(type.toUpperCase(Locale.ENGLISH));
 		} catch (Exception e) {
 			logger.error("unknown type: {}", type);
 			kType = KeyboardType.TEXT;
@@ -418,15 +452,21 @@ public class KeyboardPane extends Region implements StandardKeyCode, EventHandle
 		}
 	}
 
+	@Override
+	public ObservableList<Node> getChildren() {
+		return super.getChildren();
+	}
+
 	private Region createKeyboardPane(Keyboard layout) {
 
-		GridPane rPane = new GridPane();
-		rPane.setAlignment(Pos.CENTER);
-		// pane.setPrefSize(600, 200);
+		VBox rPane = new VBox();
+		rPane.setAlignment(Pos.TOP_CENTER);
+		rPane.setMaxWidth(1500);
+		rPane.setSpacing(2);
 
-		if (layout.getVerticalGap() != null) {
-			rPane.setVgap(layout.getVerticalGap());
-		}
+		// if (layout.getVerticalGap() != null) {
+		// rPane.setSpacing(layout.getVerticalGap());
+		// }
 		rPane.getStyleClass().add("key-background-row");
 
 		int defaultKeyWidth = 10;
@@ -439,13 +479,15 @@ public class KeyboardPane extends Region implements StandardKeyCode, EventHandle
 			defaultKeyHeight = layout.getKeyHeight();
 		}
 
+		defaultKeyHeight += 40;
+
 		int rowIdx = 0;
 		for (Keyboard.Row row : layout.getRow()) {
 			int colIdx = 0;
 			GridPane colPane = new GridPane();
 			colPane.getStyleClass().add("key-background-column");
 			// colPane.setVgap(20);
-			// colPane.setPrefWidth(Region.USE_COMPUTED_SIZE);
+			colPane.setPrefWidth(Region.USE_COMPUTED_SIZE);
 
 			RowConstraints rc = new RowConstraints();
 			rc.setPrefHeight(defaultKeyHeight);
@@ -497,7 +539,7 @@ public class KeyboardPane extends Region implements StandardKeyCode, EventHandle
 				button.setOnShortPressed(this);
 				// button.setCache(true);
 
-				button.setMinHeight(10);
+				button.setMinHeight(defaultKeyHeight);
 				button.setPrefHeight(defaultKeyHeight);
 				button.setPrefWidth(defaultKeyWidth);
 				button.setMaxWidth(defaultKeyWidth * 100);
@@ -514,7 +556,7 @@ public class KeyboardPane extends Region implements StandardKeyCode, EventHandle
 						button.getStyleClass().add(style.substring(1));
 					}
 				}
-				if (Boolean.TRUE == key.isSticky()){
+				if (Boolean.TRUE == key.isSticky()) {
 					button.getStyleClass().add("sticky-style");
 				}
 				if (codes.length > 0 && !codes[0].isEmpty()) {
@@ -549,7 +591,8 @@ public class KeyboardPane extends Region implements StandardKeyCode, EventHandle
 
 				} else if (key.getKeyIconStyle() != null && key.getKeyIconStyle().startsWith("@")) {
 
-					try (InputStream is = KeyboardPane.class.getResourceAsStream(key.getKeyIconStyle().replace("@", "/") + ".png")) {
+					try (InputStream is = KeyboardPane.class
+							.getResourceAsStream(key.getKeyIconStyle().replace("@", "/") + ".png")) {
 						Image image = new Image(is);
 						if (!image.isError()) {
 							button.setGraphic(new ImageView(image));
@@ -561,7 +604,8 @@ public class KeyboardPane extends Region implements StandardKeyCode, EventHandle
 					}
 				}
 
-				button.setText(key.getKeyLabel() != null ? key.getKeyLabel() : Character.toString((char) button.getKeyCode()));
+				button.setText(
+						key.getKeyLabel() != null ? key.getKeyLabel() : Character.toString((char) button.getKeyCode()));
 				button.setKeyText(key.getKeyOutputText());
 
 				if (key.getKeyEdgeFlags() != null) {
@@ -605,7 +649,7 @@ public class KeyboardPane extends Region implements StandardKeyCode, EventHandle
 			logger.trace("row[{}] - {}", rowIdx, rowWidth);
 			colPane.getRowConstraints().add(rc);
 			// colPane.setGridLinesVisible(true);
-			rPane.add(colPane, 0, rowIdx);
+			rPane.getChildren().add(colPane);
 			rowIdx++;
 		}
 
@@ -748,20 +792,21 @@ public class KeyboardPane extends Region implements StandardKeyCode, EventHandle
 
 		logger.trace("send ({}) ctrl={}", ch, ctrl);
 
-		if (ctrl) {
-			switch (Character.toUpperCase(ch)) {
-			case java.awt.event.KeyEvent.VK_MINUS:
-				if (scaleProperty.get() > minScaleProperty.get()) {
-					scaleProperty.set(scaleProperty.get() - scaleOffsetProperty.get());
-				}
-				return;
-			case 0x2B:
-				if (scaleProperty.get() < maxScaleProperty.get()) {
-					scaleProperty.set(scaleProperty.get() + scaleOffsetProperty.get());
-				}
-				return;
-			}
-		}
+		// zakomentirano zoomiranje
+		// if (ctrl) {
+		// switch (Character.toUpperCase(ch)) {
+		// case java.awt.event.KeyEvent.VK_MINUS:
+		// if (scaleProperty.get() > minScaleProperty.get()) {
+		// scaleProperty.set(scaleProperty.get() - scaleOffsetProperty.get());
+		// }
+		// return;
+		// case 0x2B:
+		// if (scaleProperty.get() < maxScaleProperty.get()) {
+		// scaleProperty.set(scaleProperty.get() + scaleOffsetProperty.get());
+		// }
+		// return;
+		// }
+		// }
 
 		if (robots.isEmpty()) {
 			logger.error("no robot handler available");
@@ -780,7 +825,7 @@ public class KeyboardPane extends Region implements StandardKeyCode, EventHandle
 	public List<IRobot> getRobotHandler() {
 		return Collections.unmodifiableList(robots);
 	}
-	
+
 	public void removeRobotHandler(IRobot robot) {
 		robots.remove(robot);
 	}
